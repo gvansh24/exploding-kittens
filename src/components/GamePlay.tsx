@@ -76,6 +76,7 @@ export default function GamePlay() {
 
   // End Turn Mechanism (Drawing card)
   const drawCard = (playerIdx: number) => {
+    setSeeTheFutureCards(null);
     if (gameOver || pendingDefusal) return;
     const activePlayer = players[playerIdx];
     if (activePlayer.isDead) return;
@@ -179,6 +180,7 @@ export default function GamePlay() {
 
   // Turn management flow
   const advanceTurn = (playerIdx: number) => {
+    setSeeTheFutureCards(null);
     if (attackTurnsRemaining > 1) {
       setAttackTurnsRemaining(prev => prev - 1);
       addLog(players[playerIdx].name, "DRAW REMAINING", `Must draw again due to stacked Attacks! (${attackTurnsRemaining - 1} attack draws remaining.)`);
@@ -189,15 +191,15 @@ export default function GamePlay() {
     }
   };
 
-  const findNextPlayer = (currentIndex: number) => {
-    let nextIdx = (currentIndex + 1) % players.length;
+  const findNextPlayer = (currentIndex: number, currentPlayersState: Player[] = players) => {
+    let nextIdx = (currentIndex + 1) % currentPlayersState.length;
     let loops = 0;
-    while (players[nextIdx].isDead && loops < players.length) {
-      nextIdx = (nextIdx + 1) % players.length;
+    while (currentPlayersState[nextIdx].isDead && loops < currentPlayersState.length) {
+      nextIdx = (nextIdx + 1) % currentPlayersState.length;
       loops++;
     }
 
-    if (loops >= players.length) {
+    if (loops >= currentPlayersState.length) {
       // Safe guard
       setGameOver(true);
     } else {
@@ -230,7 +232,7 @@ export default function GamePlay() {
     } else {
       // Find next player, cancel leftover attacks from the dead player
       setAttackTurnsRemaining(0);
-      findNextPlayer(playerIdx);
+      findNextPlayer(playerIdx, updatedPlayers);
     }
   };
 
@@ -423,6 +425,10 @@ export default function GamePlay() {
     updatedHand.splice(cardIndex, 1);
 
     // Handle Card Specials
+    if (card.type !== CardType.SEE_THE_FUTURE) {
+      setSeeTheFutureCards(null);
+    }
+
     if (card.type === CardType.SKIP) {
       setDiscardPile(prev => [card, ...prev]);
       setPlayers(prev => prev.map((p, idx) => idx === 0 ? { ...p, hand: updatedHand } : p));
@@ -491,6 +497,7 @@ export default function GamePlay() {
 
   // Launch pair-combo to steal card
   const handlePlayPairCombo = () => {
+    setSeeTheFutureCards(null);
     if (selectedCardsForCombo.length !== 2) return;
     const user = players[0];
     
