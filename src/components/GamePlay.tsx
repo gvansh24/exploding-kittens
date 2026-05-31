@@ -890,7 +890,7 @@ export default function GamePlay() {
             </div>
 
             {/* Active Live logs ticker */}
-            <div className="bg-white border-4 border-black rounded-xl p-4 flex flex-col h-[220px] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+            <div className="bg-white border-4 border-black rounded-xl p-4 flex flex-col h-[440px] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
               <h3 className="font-sans font-black text-xs tracking-wider uppercase text-black mb-3 flex items-center gap-2">
                 📢 BATTLE LOGS
               </h3>
