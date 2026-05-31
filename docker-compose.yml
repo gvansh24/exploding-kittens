@@ -1,0 +1,14 @@
+version: '3.8'
+services:
+  exploding_kittens:
+    container_name: exploding_kittens
+    build: .
+    restart: always
+    environment:
+      - NODE_ENV=production
+    networks:
+      - web-gateway
+networks:
+  web-gateway:
+    name: web-gateway
+    external: true
