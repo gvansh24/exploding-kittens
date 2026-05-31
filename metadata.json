@@ -1,0 +1,8 @@
+{
+  "name": "Exploding Kittens",
+  "description": "An interactive digital card game based on the popular game Exploding Kittens, featuring a smart rules grill-me workspace and AI opponents.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
