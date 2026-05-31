@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { 
   Play, RotateCcw, HelpCircle, Layers, Trash2, Shield, Eye, Flame, Bomb, ArrowRight, UserPlus, 
   HelpCircle as QuestionIcon, Sparkles, Smile, Star, PlusCircle, AlertCircle
@@ -27,9 +28,9 @@ export default function GamePlay() {
 
   const logsEndRef = useRef<HTMLDivElement>(null);
 
-  // Auto scroll logs
+  // Auto scroll logs without jumping window
   useEffect(() => {
-    logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    logsEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
   }, [logs]);
 
   // Initial Game Setup
@@ -171,7 +172,8 @@ export default function GamePlay() {
     });
     setPlayers(updatedPlayers);
 
-    addLog(activePlayer.name, "🛠️ PLAYED DEFUSE", `Defused the Exploding Kitten! Slid it privately back into the deck at the: ${label}.`, true);
+    const logLabel = playerIndex === 0 ? `at the: ${label}.` : `in secret.`;
+    addLog(activePlayer.name, "🛠️ PLAYED DEFUSE", `Defused the Exploding Kitten! Slid it privately back into the deck ${logLabel}`, true);
     setPendingDefusal(null);
 
     // Advance turn index
@@ -288,23 +290,21 @@ export default function GamePlay() {
     const deckDangerRatio = deck.length <= 4;
 
     if (matchingPairKey) {
-      // Play matching pair to steal card from human player!
       const idxs = cardCounts[matchingPairKey];
       const cardA = botHand[idxs[0]];
       const cardB = botHand[idxs[1]];
 
-      // Remove from hand
       const nextHand = botHand.filter((_, i) => i !== idxs[0] && i !== idxs[1]);
       
-      // Update bot hand
-      const targetIdx = 0; // target human player
-      const targetPlayer = players[targetIdx];
+      const validTargets = players.filter((p, i) => i !== botIdx && !p.isDead && p.hand.length > 0);
       
-      if (targetPlayer && targetPlayer.hand.length > 0 && !targetPlayer.isDead) {
+      if (validTargets.length > 0) {
+        const targetPlayer = validTargets[Math.floor(Math.random() * validTargets.length)];
+        const targetIdx = players.findIndex(p => p.id === targetPlayer.id);
+
         const randomTargetCardIdx = Math.floor(Math.random() * targetPlayer.hand.length);
         const stolenCard = targetPlayer.hand[randomTargetCardIdx];
 
-        // Update target player hand
         const newTargetHand = targetPlayer.hand.filter((_, i) => i !== randomTargetCardIdx);
 
         setPlayers(prev => prev.map((p, pIdx) => {
@@ -314,10 +314,15 @@ export default function GamePlay() {
         }));
 
         setDiscardPile(prev => [cardA, cardB, ...prev]);
-        addLog(bot.name, "🐾 PLAYED PAIR COMBO", `Used two matching '${matchingPairKey}' cards to steal a random card from your hand!`, true);
+        
+        const logMsg = targetIdx === 0 
+          ? `Used two matching '${matchingPairKey}' cards to steal a random card from your hand!`
+          : `Used two matching '${matchingPairKey}' cards to steal a random card from ${targetPlayer.name}!`;
+          
+        addLog(bot.name, "🐾 PLAYED PAIR COMBO", logMsg, targetIdx === 0);
         setIsBotThinking(false);
         setBotActionTrigger(prev => prev + 1);
-        return; // Bot made a move, re-triggers AI for secondary action
+        return;
       }
     }
 
@@ -562,82 +567,15 @@ export default function GamePlay() {
         </div>
       ) : (
         // Play area layout
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 items-start font-sans">
+        <div className="grid grid-cols-1 xl:grid-cols-5 gap-4 items-start font-sans">
           
-          {/* LEFT SIDEBAR: Logs and Stats (1 col) */}
-          <div className="xl:col-span-1 space-y-4 text-black">
-            {/* Deck & Discard Overview Info */}
-            <div className="bg-white border-4 border-black p-4 rounded-xl flex items-center justify-between shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-              <div className="flex items-center gap-3">
-                <Layers className="text-red-600 w-5 h-5" />
-                <div>
-                  <span className="text-xs text-slate-700 block font-mono font-black uppercase">REMAINING DECK</span>
-                  <span className="text-xl font-black font-mono text-black">{deck.length} Cards</span>
-                </div>
-              </div>
-              <div className="bg-yellow-300 px-2.5 py-1.5 rounded-lg text-center border-2 border-black min-w-16">
-                <span className="text-[10px] text-black font-black uppercase block">ATTACKS</span>
-                <span className="font-mono text-xs font-black text-black">{attackTurnsRemaining} Turns</span>
-              </div>
-            </div>
-
-            {/* Discard Pile Top */}
-            <div className="bg-white border-4 border-black p-4 rounded-xl flex flex-col items-center text-center justify-center relative min-h-24 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-              <span className="text-[10px] text-slate-800 font-bold block absolute top-2 left-3 uppercase">DISCARD PILE</span>
-              {discardPile.length > 0 ? (
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="text-xl">{discardPile[0].emoji}</span>
-                  <div>
-                    <span className="text-xs font-black text-black block uppercase">{discardPile[0].title}</span>
-                    <span className="text-[9px] text-slate-700 font-bold block">{discardPile[0].description}</span>
-                  </div>
-                </div>
-              ) : (
-                <span className="text-xs text-slate-500 font-bold italic mt-3">No discarded cards yet.</span>
-              )}
-            </div>
-
-            {/* Active Live logs ticker */}
-            <div className="bg-white border-4 border-black rounded-xl p-4 flex flex-col h-[280px] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-              <h3 className="font-sans font-black text-xs tracking-wider uppercase text-black mb-3 flex items-center gap-2">
-                📢 BATTLE LOGS
-              </h3>
-              <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 text-xs">
-                {logs.map((log) => (
-                  <div 
-                    key={log.id} 
-                    className={`p-2 rounded border-2 border-black leading-tight shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] ${
-                      log.isImportant 
-                        ? "bg-red-200 border-black text-black font-bold" 
-                        : "bg-slate-100 border-black text-black"
-                    }`}
-                  >
-                    <span className="font-black text-red-700 block uppercase text-[9px] font-mono select-none">
-                      {log.playerName}
-                    </span>
-                    <span className="font-mono text-[10px] text-black font-black">{log.action}:</span>{" "}
-                    <span className="font-sans text-[11px] font-semibold">{log.detail}</span>
-                  </div>
-                ))}
-                <div ref={logsEndRef} />
-              </div>
-            </div>
-            
-            {/* Reset widget */}
-            <button
-              onClick={handleStartGame}
-              className="w-full bg-red-500 hover:bg-red-600 border-4 border-black text-white py-3.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer font-black uppercase tracking-wider shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Reshuffle & Restart Arena</span>
-            </button>
-          </div>
-
-          {/* MAIN ARENA BOARD (3 cols) */}
-          <div className="xl:col-span-3 space-y-6">
-            
+          {/* LEFT SIDEBAR: Bot Opponents (1 col) */}
+          <div className="xl:col-span-1 space-y-4">
+            <h3 className="font-sans font-black text-xs tracking-wider uppercase text-black flex items-center gap-2">
+              🤖 AI CHALLENGERS
+            </h3>
             {/* BOT PLAYERS HUD */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               {players.slice(1).map((bot, bIdx) => {
                 const isCurrent = currentPlayerIndex === bIdx + 1;
                 const deadClass = bot.isDead ? "opacity-50 grayscale border-black bg-slate-100 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]" : "bg-white text-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]";
@@ -666,7 +604,7 @@ export default function GamePlay() {
                             💥 DEAD
                           </span>
                         ) : (
-                          <span className="text-xs text-white font-mono font-black bg-black px-2 py-1 rounded border-2 border-black">
+                          <span className="whitespace-nowrap flex items-center justify-center text-xs text-white font-mono font-black bg-black px-2 py-1 rounded border-2 border-black">
                             {bot.hand.length} Cards
                           </span>
                         )}
@@ -686,77 +624,155 @@ export default function GamePlay() {
                 );
               })}
             </div>
+          </div>
 
+          {/* CENTER ARENA: Table & Hand (3 cols) */}
+          <div className="xl:col-span-3 space-y-4">
+            {/* CENTRAL TABLE: DECK & DISCARD PILE */}
+            <div className="bg-emerald-600 border-8 border-amber-900 rounded-2xl p-3 shadow-[inset_0px_0px_20px_rgba(0,0,0,0.5),8px_8px_0px_0px_rgba(0,0,0,1)] relative overflow-hidden flex flex-col items-center justify-center min-h-[160px]">
+              {/* Pattern overlay */}
+              <div className="absolute inset-0 opacity-10 bg-[radial-gradient(circle_at_center,_#ffffff_0%,_transparent_100%)]"></div>
+              
+              <div className="flex gap-12 sm:gap-24 items-center relative z-10 w-full justify-center">
+                {/* DRAW DECK */}
+                <div className="flex flex-col items-center relative">
+                  <span className="text-white font-black uppercase text-xs mb-2 tracking-widest drop-shadow-md">Draw Deck</span>
+                  <div className="relative w-32 aspect-[2/3] cursor-pointer group" onClick={() => { if(currentPlayerIndex===0) drawCard(0); }}>
+                    {deck.length > 0 ? (
+                      Array.from({ length: Math.min(deck.length, 5) }).map((_, i) => (
+                        <div 
+                          key={`deck-${i}`}
+                          className="absolute w-full h-full bg-slate-800 border-4 border-black rounded-xl shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center bg-[repeating-linear-gradient(45deg,transparent,transparent_10px,#000000_10px,#000000_20px)] transition-transform group-hover:-translate-y-1"
+                          style={{ top: -i * 3, left: -i * 3, zIndex: i }}
+                        >
+                          <div className="bg-white m-2 absolute inset-0 rounded border-2 border-black flex items-center justify-center">
+                            <span className="text-4xl">🐱</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="w-full h-full border-4 border-dashed border-emerald-800 rounded-xl flex items-center justify-center opacity-50">
+                        <span className="text-emerald-900 font-bold text-xs uppercase">Empty</span>
+                      </div>
+                    )}
+                  </div>
+                  <span className="mt-8 bg-black text-white font-mono text-xs px-3 py-1 rounded-full border-2 border-white shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                    {deck.length} Left
+                  </span>
+                </div>
+
+                {/* DISCARD PILE */}
+                <div className="flex flex-col items-center relative">
+                  <span className="text-white font-black uppercase text-xs mb-2 tracking-widest drop-shadow-md">Discard Pile</span>
+                  <div className="relative w-32 aspect-[2/3]">
+                    {discardPile.length > 0 ? (
+                      <AnimatePresence>
+                        {discardPile.slice(0, 5).reverse().map((card, idx) => {
+                          const isTop = idx === Math.min(discardPile.length, 5) - 1;
+                          return (
+                            <motion.div 
+                              layoutId={`card-${card.id}`}
+                              key={card.id}
+                              initial={{ opacity: 0, scale: 1.5, y: -50 }}
+                              animate={{ opacity: 1, scale: 1, y: 0, rotate: (card.id.length % 5 - 2) * 8 }}
+                              className={`absolute w-full h-full p-2 rounded-xl border-4 border-black flex flex-col justify-between text-left shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] bg-white ${card.color} ${!isTop && 'opacity-80 grayscale-[0.5]'}`}
+                              style={{ zIndex: idx }}
+                            >
+                              <div className="flex justify-between items-start gap-1">
+                                <span className="font-sans font-black text-[10px] uppercase block text-black tracking-tighter leading-none line-clamp-1">{card.title}</span>
+                              </div>
+                              <div className="flex-1 flex items-center justify-center py-1">
+                                <span className="text-4xl filter drop-shadow">{card.emoji}</span>
+                              </div>
+                            </motion.div>
+                          );
+                        })}
+                      </AnimatePresence>
+                    ) : (
+                      <div className="w-full h-full border-4 border-dashed border-emerald-800 rounded-xl flex items-center justify-center opacity-50">
+                        <span className="text-emerald-900 font-bold text-xs uppercase text-center px-2">Play Here</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
             {/* INTERACTIVE STATE OVERLAYS */}
             {seeTheFutureCards && (
-              <div className="bg-white border-4 border-black p-5 rounded-xl relative overflow-hidden shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] text-black">
-                <div className="absolute top-0 right-0 p-4 text-purple-600 text-5xl opacity-20">🔮</div>
-                <h3 className="font-sans font-black text-purple-900 text-base mb-1 uppercase tracking-tight">Cosmic Visions (See the Future)</h3>
-                <p className="text-xs text-slate-800 font-bold mb-4">Privately view the upcoming 3 cards remaining in the deck index:</p>
-                <div className="grid grid-cols-3 gap-3">
-                  {seeTheFutureCards.length > 0 ? (
-                    seeTheFutureCards.map((card, idx) => (
-                      <div key={idx} className="bg-purple-100 border-2 border-black p-3 rounded-lg text-center shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] text-black">
-                        <span className="text-xl block mb-1">{card.emoji}</span>
-                        <h4 className="text-xs font-black text-black block">{card.title}</h4>
-                        <span className="text-[10px] text-purple-950 font-bold">{idx === 0 ? "Next drawn" : idx === 1 ? "2nd card" : "3rd card"}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <span className="text-xs text-purple-800 font-black italic">Deck holds no cards payload currently!</span>
-                  )}
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+                <div className="bg-white border-4 border-black p-6 sm:p-8 rounded-2xl relative shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] text-black max-w-2xl w-full mx-auto animate-in fade-in zoom-in duration-200">
+                  <div className="absolute top-0 right-0 p-4 text-purple-600 text-5xl sm:text-7xl opacity-20 pointer-events-none">🔮</div>
+                  <h3 className="font-sans font-black text-purple-900 text-xl mb-1 uppercase tracking-tight">Cosmic Visions (See the Future)</h3>
+                  <p className="text-sm text-slate-800 font-bold mb-6">Privately view the upcoming 3 cards remaining in the deck index:</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {seeTheFutureCards.length > 0 ? (
+                      seeTheFutureCards.map((card, idx) => (
+                        <div key={idx} className="bg-purple-100 border-2 border-black p-4 rounded-xl text-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] text-black flex flex-col items-center justify-center">
+                          <span className="text-4xl block mb-2">{card.emoji}</span>
+                          <h4 className="text-sm font-black text-black block">{card.title}</h4>
+                          <span className="text-[11px] text-purple-950 font-bold uppercase mt-1">{idx === 0 ? "Next drawn" : idx === 1 ? "2nd card" : "3rd card"}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <span className="text-sm text-purple-800 font-black italic col-span-3 text-center">Deck holds no cards payload currently!</span>
+                    )}
+                  </div>
+                  <div className="mt-8 flex justify-end">
+                    <button
+                      onClick={() => setSeeTheFutureCards(null)}
+                      className="bg-purple-400 hover:bg-purple-300 text-black text-sm font-black py-3 px-8 border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] rounded-xl transition duration-100 cursor-pointer uppercase shrink-0"
+                    >
+                      Close Vision
+                    </button>
+                  </div>
                 </div>
-                <button
-                  onClick={() => setSeeTheFutureCards(null)}
-                  className="mt-4 bg-purple-400 hover:bg-purple-300 text-black text-xs font-black py-2 px-4 border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[1px] rounded transition duration-100 cursor-pointer uppercase shrink-0"
-                >
-                  Close Vision
-                </button>
               </div>
             )}
 
             {pendingDefusal && (
-              <div className="bg-emerald-300 border-4 border-black p-6 rounded-xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] text-center text-black flex flex-col justify-center items-center">
-                <Shield className="w-12 h-12 text-black mb-4 animate-pulse" />
-                <h3 className="font-sans font-black text-black text-2xl tracking-tighter uppercase">KITTEN DEFUSAL REQUIRED!</h3>
-                <p className="text-xs text-black font-black max-w-sm mt-2 leading-relaxed">
-                  {players[pendingDefusal.playerIndex].name} drew an Exploding Kitten! 
-                  Fortunately, a **Defuse card** is held in your inventory payload. 
-                  Choose exactly where you want to insert the Kitten card back into the remaining deck secretly:
-                </p>
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur p-4">
+                <div className="bg-emerald-300 border-4 border-black p-8 sm:p-12 rounded-3xl shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] text-center text-black flex flex-col justify-center items-center max-w-3xl w-full mx-auto animate-in zoom-in duration-300">
+                  <Shield className="w-16 h-16 text-black mb-4 animate-pulse" />
+                  <h3 className="font-sans font-black text-black text-3xl sm:text-4xl tracking-tighter uppercase">KITTEN DEFUSAL REQUIRED!</h3>
+                  <p className="text-sm sm:text-base text-black font-black max-w-lg mt-4 leading-relaxed">
+                    {players[pendingDefusal.playerIndex].name} drew an Exploding Kitten! 
+                    Fortunately, a **Defuse card** is held in your inventory payload. 
+                    Choose exactly where you want to insert the Kitten card back into the remaining deck secretly:
+                  </p>
 
-                {currentPlayerIndex === 0 ? (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6 w-full max-w-xl">
-                    <button
-                      onClick={() => handleDefuseKitten("TOP")}
-                      className="bg-white hover:bg-slate-100 border-2 border-black text-black text-xs font-black p-3 rounded shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer"
-                    >
-                      Top Spot (1st)
-                    </button>
-                    <button
-                      onClick={() => handleDefuseKitten("MID")}
-                      className="bg-white hover:bg-slate-100 border-2 border-black text-black text-xs font-black p-3 rounded shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer"
-                    >
-                      3rd Card Spot
-                    </button>
-                    <button
-                      onClick={() => handleDefuseKitten("BOTTOM")}
-                      className="bg-white hover:bg-slate-100 border-2 border-black text-black text-xs font-black p-3 rounded shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer"
-                    >
-                      Bottom Spot
-                    </button>
-                    <button
-                      onClick={() => handleDefuseKitten("RANDOM")}
-                      className="bg-white hover:bg-slate-100 border-2 border-black text-black text-xs font-black p-3 rounded shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer"
-                    >
-                      Random Spot
-                    </button>
-                  </div>
-                ) : (
-                  <div className="mt-4 text-xs text-black font-black italic">
-                    AI bot is placing the kitten back...
-                  </div>
-                )}
+                  {currentPlayerIndex === 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8 w-full max-w-2xl">
+                      <button
+                        onClick={() => handleDefuseKitten("TOP")}
+                        className="bg-white hover:bg-slate-100 border-4 border-black text-black text-sm font-black p-4 rounded-xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer uppercase"
+                      >
+                        Top Spot (1st)
+                      </button>
+                      <button
+                        onClick={() => handleDefuseKitten("MID")}
+                        className="bg-white hover:bg-slate-100 border-4 border-black text-black text-sm font-black p-4 rounded-xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer uppercase"
+                      >
+                        3rd Card Spot
+                      </button>
+                      <button
+                        onClick={() => handleDefuseKitten("BOTTOM")}
+                        className="bg-white hover:bg-slate-100 border-4 border-black text-black text-sm font-black p-4 rounded-xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer uppercase"
+                      >
+                        Bottom Spot
+                      </button>
+                      <button
+                        onClick={() => handleDefuseKitten("RANDOM")}
+                        className="bg-white hover:bg-slate-100 border-4 border-black text-black text-sm font-black p-4 rounded-xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer uppercase"
+                      >
+                        Random Spot
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="mt-8 text-sm sm:text-base text-black font-black italic bg-emerald-400 p-4 border-4 border-black rounded-xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                      AI bot is placing the kitten back...
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -813,47 +829,47 @@ export default function GamePlay() {
               </div>
 
               {/* HAND LIST OR DRAWER */}
-              <div className="flex gap-3 overflow-x-auto pb-4 pt-1 snap-x scrollbar-thin">
+              <div className="flex flex-wrap justify-center gap-3 pb-4 pt-1 max-h-[280px] overflow-y-auto">
                 {players[0]?.hand?.length > 0 ? (
-                  players[0].hand.map((card, idx) => {
-                    const isComboSelected = selectedCardsForCombo.includes(card.id);
-                    const selectedBorder = isComboSelected ? "ring-4 ring-yellow-300 scale-102 font-black rotate-1" : "";
-                    const selectOpacity = (currentPlayerIndex !== 0) ? "opacity-75" : "";
+                  <AnimatePresence>
+                    {players[0].hand.map((card, idx) => {
+                      const isComboSelected = selectedCardsForCombo.includes(card.id);
+                      const selectedBorder = isComboSelected ? "ring-4 ring-yellow-300 font-black" : "";
+                      const selectOpacity = (currentPlayerIndex !== 0) ? "opacity-75" : "";
 
-                    return (
-                      <button
-                        key={card.id || idx}
-                        onClick={() => handlePlayCard(card, idx)}
-                        disabled={currentPlayerIndex !== 0 || pendingDefusal || gameOver}
-                        className={`min-w-[130px] w-36 aspect-[2/3] p-3 rounded-xl border-4 border-black flex flex-col justify-between text-left transition duration-150 relative cursor-pointer group shrink-0 ${card.color} ${selectedBorder} ${selectOpacity}`}
-                      >
-                        {/* Card Header title */}
-                        <div className="flex justify-between items-start gap-1">
-                          <span className="font-sans font-black text-xs uppercase block text-black tracking-tighter select-none leading-none">
-                            {card.title}
-                          </span>
-                          <span className="text-sm shrink-0 select-none">{card.emoji}</span>
-                        </div>
-
-                        {/* Card Graphic/Emoji centerpiece */}
-                        <div className="flex-1 flex items-center justify-center py-1 opacity-95 group-hover:scale-105 transition select-none">
-                          <span className="text-4xl filter drop-shadow">{card.emoji}</span>
-                        </div>
-
-                        {/* Card Description */}
-                        <span className="text-[9px] text-black font-semibold block leading-tight h-10 select-none line-clamp-3">
-                          {card.description}
-                        </span>
-
-                        {/* Stolen Select dot indicator */}
-                        {isComboSelected && (
-                          <div className="absolute top-1.5 right-1.5 bg-yellow-300 p-0.5 rounded border border-black shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]">
-                            <span className="text-[7.5px] text-black font-black px-0.5 block select-none leading-none">PAIR</span>
+                      return (
+                        <motion.button
+                          layoutId={`card-${card.id}`}
+                          initial={{ opacity: 0, y: 50, scale: 0.8 }}
+                          animate={{ opacity: 1, y: 0, scale: 1, rotate: isComboSelected ? 2 : 0 }}
+                          exit={{ opacity: 0, scale: 0.8 }}
+                          whileHover={{ y: -15, scale: 1.05 }}
+                          key={card.id || idx}
+                          onClick={() => handlePlayCard(card, idx)}
+                          disabled={currentPlayerIndex !== 0 || pendingDefusal || gameOver}
+                          className={`min-w-[130px] w-36 aspect-[2/3] p-3 rounded-xl border-4 border-black flex flex-col justify-between text-left relative cursor-pointer group shrink-0 bg-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] ${card.color} ${selectedBorder} ${selectOpacity}`}
+                        >
+                          <div className="flex justify-between items-start gap-1">
+                            <span className="font-sans font-black text-xs uppercase block text-black tracking-tighter select-none leading-none">
+                              {card.title}
+                            </span>
+                            <span className="text-sm shrink-0 select-none">{card.emoji}</span>
                           </div>
-                        )}
-                      </button>
-                    );
-                  })
+                          <div className="flex-1 flex items-center justify-center py-1 opacity-95 group-hover:scale-105 transition select-none">
+                            <span className="text-4xl filter drop-shadow">{card.emoji}</span>
+                          </div>
+                          <span className="text-[9px] text-black font-semibold block leading-tight h-10 select-none line-clamp-3">
+                            {card.description}
+                          </span>
+                          {isComboSelected && (
+                            <div className="absolute top-1.5 right-1.5 bg-yellow-300 p-0.5 rounded border border-black shadow-[1px_1px_0px_0px_rgba(0,0,0,1)]">
+                              <span className="text-[7.5px] text-black font-black px-0.5 block select-none leading-none">PAIR</span>
+                            </div>
+                          )}
+                        </motion.button>
+                      );
+                    })}
+                  </AnimatePresence>
                 ) : (
                   <div className="w-full text-center py-6 text-xs text-slate-800 font-bold italic">
                     {players[0]?.isDead ? "💥 You are dead! Restart the matches above." : "Zero cards in hand! Select \"Draw Card\" to replenish your tactical cargo."}
@@ -861,6 +877,52 @@ export default function GamePlay() {
                 )}
               </div>
             </div>
+          </div>
+
+          {/* RIGHT SIDEBAR: Logs and Stats (1 col) */}
+          <div className="xl:col-span-1 space-y-4 text-black">
+            {/* Game Stats */}
+            <div className="bg-white border-4 border-black p-4 rounded-xl flex items-center justify-between shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+              <div className="bg-yellow-300 px-2.5 py-1.5 rounded-lg text-center border-2 border-black w-full">
+                <span className="text-[10px] text-black font-black uppercase block">ATTACKS</span>
+                <span className="font-mono text-xs font-black text-black">{attackTurnsRemaining} Turns Remaining</span>
+              </div>
+            </div>
+
+            {/* Active Live logs ticker */}
+            <div className="bg-white border-4 border-black rounded-xl p-4 flex flex-col h-[220px] shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+              <h3 className="font-sans font-black text-xs tracking-wider uppercase text-black mb-3 flex items-center gap-2">
+                📢 BATTLE LOGS
+              </h3>
+              <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 text-xs">
+                {logs.map((log) => (
+                  <div 
+                    key={log.id} 
+                    className={`p-2 rounded border-2 border-black leading-tight shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] ${
+                      log.isImportant 
+                        ? "bg-red-200 border-black text-black font-bold" 
+                        : "bg-slate-100 border-black text-black"
+                    }`}
+                  >
+                    <span className="font-black text-red-700 block uppercase text-[9px] font-mono select-none">
+                      {log.playerName}
+                    </span>
+                    <span className="font-mono text-[10px] text-black font-black">{log.action}:</span>{" "}
+                    <span className="font-sans text-[11px] font-semibold">{log.detail}</span>
+                  </div>
+                ))}
+                <div ref={logsEndRef} />
+              </div>
+            </div>
+            
+            {/* Reset widget */}
+            <button
+              onClick={handleStartGame}
+              className="w-full bg-red-500 hover:bg-red-600 border-4 border-black text-white py-3.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer font-black uppercase tracking-wider shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Reshuffle & Restart Arena</span>
+            </button>
           </div>
         </div>
       )}

@@ -60,13 +60,13 @@ export default function App() {
       </header>
 
       {/* CORE DISPLAY WINDOW */}
-      <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex-1">
+      <main className="max-w-[1600px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex-1">
         {activeTab === "PLAY" && (
           <div className="space-y-6">
             {/* Banner info */}
-            <div className="bg-yellow-300 border-4 border-black p-4 rounded-2xl text-xs text-black font-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] md:flex items-center justify-between gap-4">
+            <div className="bg-yellow-300 border-2 border-black py-2 px-4 rounded-xl text-[10px] text-black font-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] md:flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <Sparkles className="text-black shrink-0 w-4 h-4" />
+                <Sparkles className="text-black shrink-0 w-3 h-3" />
                 <span>
                   Tip: If you collect a Pair of matching Cat cards in your hand, you can active-press them to steal random cards from AI opponents!
                 </span>
